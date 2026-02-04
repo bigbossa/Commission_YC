@@ -35,7 +35,7 @@ git clone <repository-url>
 cd commission-dashboard-table
 
 # Install dependencies
-pnpm install
+npm install
 
 # Copy environment file
 cp .env.example .env.local
@@ -68,13 +68,13 @@ POSTGRES_PASSWORD=your_password
 
 ```bash
 # Development mode (port 3333)
-pnpm dev
+npm dev
 
 # Build for production
-pnpm build
+npm build
 
 # Start production server
-pnpm start
+npm start
 ```
 
 เปิดเบราว์เซอร์ที่ [http://localhost:3333](http://localhost:3333)
@@ -160,7 +160,7 @@ if (qty <= 1000) {
 
 ## License
 
-MIT
+line 0987439887
 
 ## Support
 
