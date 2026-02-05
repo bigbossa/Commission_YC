@@ -25,6 +25,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { format } from "date-fns"
 import { th } from "date-fns/locale"
 import { cn } from "@/lib/utils"
@@ -34,6 +41,17 @@ interface AnalyticsData {
   EmployeeName: string
   BPC_DIMENSION5_: string
   TotalQTY: number
+}
+
+interface AnalyticsDetailData {
+  ItemNo: string
+  SalesId: string
+  InvoiceId: string
+  LastSettleVoucher: string
+  RecId: string
+  Description: string
+  TotalQTY: number
+  LastSettleDate: string
 }
 
 interface YearData {
@@ -55,6 +73,13 @@ export default function AnalyticsPage() {
   const [filterMode, setFilterMode] = useState<'year' | 'dateRange'>('year')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Dialog state
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState<AnalyticsData | null>(null)
+  const [detailData, setDetailData] = useState<AnalyticsDetailData[]>([])
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState<string | null>(null)
 
   // Fetch available years
   useEffect(() => {
@@ -191,6 +216,58 @@ export default function AnalyticsPage() {
       if (timeoutId) clearTimeout(timeoutId)
     }
   }, [selectedYear, startDate, endDate, filterMode, selectedDimension])
+
+  // Function to fetch detail data
+  const fetchEmployeeDetails = async (employee: AnalyticsData) => {
+    setSelectedEmployee(employee)
+    setDetailDialogOpen(true)
+    setDetailLoading(true)
+    setDetailError(null)
+    setDetailData([])
+
+    try {
+      let url = '/api/analytics/details'
+      const params = new URLSearchParams()
+      params.append('employeeCode', employee.EmployeeCode)
+
+      if (filterMode === 'dateRange' && startDate && endDate) {
+        const start = format(startDate, 'yyyy-MM-dd')
+        const end = format(endDate, 'yyyy-MM-dd')
+        params.append('startDate', start)
+        params.append('endDate', end)
+      } else if (filterMode === 'year' && selectedYear) {
+        const gregorianYear = selectedYear - 543
+        params.append('year', gregorianYear.toString())
+      }
+
+      if (selectedDimension) {
+        params.append('dimension', selectedDimension)
+      }
+
+      url += `?${params.toString()}`
+
+      const response = await fetch(url, {
+        cache: 'no-store'
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      setDetailData(data)
+    } catch (error: any) {
+      console.error('Failed to fetch employee details:', error)
+      setDetailError(error.message || 'Failed to load details')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   if (loading && selectedYear === null) {
     return (
@@ -419,7 +496,14 @@ export default function AnalyticsPage() {
                     {analyticsWithCommission.map((item, index) => (
                       <TableRow key={item.BPC_DIMENSION5_} className="hover:bg-muted/50">
                         <TableCell className="font-medium">{index + 1}</TableCell>
-                        <TableCell className="font-medium text-blue-600">{item.EmployeeCode}</TableCell>
+                        <TableCell className="font-medium">
+                          <button 
+                            onClick={() => fetchEmployeeDetails(item)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer font-medium"
+                          >
+                            {item.EmployeeCode}
+                          </button>
+                        </TableCell>
                         <TableCell className="font-medium">{item.EmployeeName}</TableCell>
                         <TableCell className="text-right font-mono text-lg text-primary font-semibold">
                           {item.TotalQTY.toLocaleString('en-US', { 
@@ -470,6 +554,101 @@ export default function AnalyticsPage() {
           </div>
         </>
       )}
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="!max-w-none w-[calc(100vw-40px)] max-h-[90vh] overflow-y-auto mx-5">
+          <DialogHeader>
+            <DialogTitle>
+              รายละเอียด QTY - {selectedEmployee?.EmployeeCode} {selectedEmployee?.EmployeeName}
+            </DialogTitle>
+            <DialogDescription>
+              แสดงรายละเอียดการขายทั้งหมดที่นำมารวม QTY
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="mt-4 w-full">
+            {detailLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <p className="text-center text-sm text-muted-foreground mt-4">กำลังโหลดข้อมูล...</p>
+              </div>
+            ) : detailError ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{detailError}</AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="mb-4 p-4 bg-muted rounded-lg">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">จำนวนรายการทั้งหมด</p>
+                      <p className="text-2xl font-bold">{detailData.length.toLocaleString()} รายการ</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">QTY รวม</p>
+                      <p className="text-2xl font-bold text-primary">
+                        {detailData.reduce((sum, item) => sum + item.TotalQTY, 0).toLocaleString('en-US', {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto w-full">
+                  <Table className="w-full min-w-full">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="font-bold bg-primary text-primary-foreground w-16">ลำดับ</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[180px]">SALESID</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[180px]">INVOICEID</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[200px]">LASTSETTLEVOUCHER</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[150px]">RECID</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[120px]">วันที่ Settle</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground text-right min-w-[100px]">QTY</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {detailData.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            ไม่พบข้อมูล
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        detailData.map((item, index) => (
+                          <TableRow key={index} className="hover:bg-muted/50">
+                            <TableCell className="font-medium">{index + 1}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.SalesId}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.InvoiceId}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.LastSettleVoucher}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.RecId}</TableCell>
+                            <TableCell>
+                              {item.LastSettleDate ? format(new Date(item.LastSettleDate), "dd/MM/yyyy", { locale: th }) : '-'}
+                            </TableCell>
+                            <TableCell className="text-right font-mono text-primary font-semibold">
+                              {item.TotalQTY.toLocaleString('en-US', {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2
+                              })}
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
