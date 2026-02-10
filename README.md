@@ -151,6 +151,16 @@ if (qty <= 1000) {
 - `POST /api/sync-to-postgres` - ซิงค์ข้อมูลไปยัง PostgreSQL
 
 ## Notes
+เช็ค 
+จะเปิดบิลจาก SALESCOMMISSION_Cache จากนั้นจะได้ เลข LASTSETTLEVOUCHER ที่เป็น PDC จากนั้นข้อมูลจะเข้า Settlement Data ที่มี VOUCHER เป็น PDC ที่ตรงกับ LASTSETTLEVOUCHER ของตาราง SALESCOMMISSION_Cache และจะได้ OFFSETTRANSVOUCHER ที่มี SM เมื่อมีการชำระเข้ามา SM จะเป็นเลข  VOUCHER และ ได้ OFFSETTRANSVOUCHER ที่อ้างอิงกับ VOUCHER ที่เป็น PDC และ ต้องเอา INVOICEDATE ของ Customer Settlement ใช้เป็นเดือนที่จ่ายค่า Commission 
+เช็ค 1 ใบ มีมากกว่า  1 อย่างได้ 
+
+ต่อมา จะมีการคืนของ เรียกว่า ใบลดหนี้
+SALESCOMMISSION_Cache
+ช่อง LASTSETTLEVOUCHER จะมี i นำหน้า เช่น ica isw จากนั้นเอาไปตรวจสอบ ในตาราง CustSettle_Cache ตาราง VOUCHER ICA กะ CA
+
+เพิ่มอีกออย่างคือ QTY ที่ชำระแล้ว
+QTY รวม คือ ยอดขายของ ช่วงเวลานั้น ที่เลือก และ ผ่านสูตรคิดค่าเฉลี่ยน อัตราเฉลี่ย (บาท/QTY) แล้ว จากนั้น เพิ่มแอีกช่องคือ QTY ที่ชำระแล้ว แล้วถึงนำค่า QTYที่ชำระแล้วมา * กับ อัตราเฉลี่ย (บาท/QTY) จะได้ค่า Commission (บาท)
 
 - Server รันที่ port 3333 (กำหนดใน package.json)
 - ข้อมูล QTY ที่เป็นค่าลบจะถูกกรองออก (QTY > 0)
