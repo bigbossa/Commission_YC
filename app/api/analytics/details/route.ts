@@ -23,33 +23,56 @@ export async function GET(request: Request) {
   try {
     console.log(`[API] Fetching analytics details for employee ${employeeCode}...`)
     
-    // Query to get detailed breakdown with sales info (no limit to get accurate total)
+    /*
+      Logic สำหรับการคำนวณ QTY:
+      - ใช้ INVOICEDATE สำหรับ filter วันที่
+      - ICA/ISW (ใบลดหนี้) = QTY ติดลบ (หักออก)
+      - อื่นๆ = QTY บวก
+    */
+    
+    // Simple query using INVOICEDATE
     let queryString = `
-      SELECT
+      SELECT 
         SALESID,
         INVOICEID,
         LASTSETTLEVOUCHER,
         RECID,
         BPC_DIMENSION5_,
-        QTY,
-        CONVERT(VARCHAR, LASTSETTLEDATE, 23) as SettleDate
+        -- QTY: ใบลดหนี้ = ลบ, อื่นๆ = บวก
+        CASE 
+          WHEN LASTSETTLEVOUCHER LIKE 'ICA%' OR LASTSETTLEVOUCHER LIKE 'ISW%'
+            THEN -QTY
+          ELSE QTY
+        END as QTY,
+        CONVERT(VARCHAR, INVOICEDATE, 23) as InvoiceDate,
+        CONVERT(VARCHAR, LASTSETTLEDATE, 23) as LastSettleDate,
+        -- กำหนด Voucher Type
+        CASE 
+          WHEN LASTSETTLEVOUCHER LIKE 'CA%' THEN 'CA'
+          WHEN LASTSETTLEVOUCHER LIKE 'RV%' THEN 'RV'
+          WHEN LASTSETTLEVOUCHER LIKE 'PDC%' THEN 'PDC'
+          WHEN LASTSETTLEVOUCHER LIKE 'ICA%' THEN 'ICA'
+          WHEN LASTSETTLEVOUCHER LIKE 'ISW%' THEN 'ISW'
+          ELSE 'OTHER'
+        END as VoucherType
       FROM SALESCOMMISSION_Cache
-      WHERE LASTSETTLEDATE IS NOT NULL 
+      WHERE INVOICEDATE IS NOT NULL 
         AND BPC_DIMENSION5_ LIKE '${employeeCode}%'
         AND QTY > 0
     `
     
+    // Filter ตามช่วงวันที่โดยใช้ INVOICEDATE
     if (startDate && endDate) {
-      queryString += ` AND LASTSETTLEDATE >= '${startDate}' AND LASTSETTLEDATE <= '${endDate}'`
+      queryString += ` AND INVOICEDATE >= '${startDate}' AND INVOICEDATE <= '${endDate}'`
     } else if (year) {
-      queryString += ` AND YEAR(LASTSETTLEDATE) = ${parseInt(year)}`
+      queryString += ` AND YEAR(INVOICEDATE) = ${parseInt(year)}`
     }
     
     if (dimension) {
       queryString += ` AND BPC_DIMENSION5_ = '${dimension}'`
     }
     
-    queryString += ` ORDER BY LASTSETTLEDATE DESC, QTY DESC`
+    queryString += ` ORDER BY INVOICEDATE DESC, ABS(QTY) DESC`
     
     console.log('[API] Executing query:', queryString)
     
@@ -64,7 +87,9 @@ export async function GET(request: Request) {
       RecId: row.RECID || '-',
       Description: row.BPC_DIMENSION5_ || '-',
       TotalQTY: row.QTY || 0,
-      LastSettleDate: row.SettleDate || null
+      InvoiceDate: row.InvoiceDate || null,
+      LastSettleDate: row.LastSettleDate || null,
+      VoucherType: row.VoucherType || '-'
     }))
     
     const duration = Date.now() - startTime

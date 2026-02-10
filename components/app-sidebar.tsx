@@ -10,7 +10,8 @@ import {
   BarChart3, 
   Menu,
   X,
-  Calculator
+  Calculator,
+  Clock
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,11 @@ const routes = [
     label: "สูตรคำนวณ",
     icon: Calculator,
     href: "/formula",
+  },
+  {
+    label: "ยอดค้างชำระ",
+    icon: Clock,
+    href: "/outstanding",
   },
 ]
 

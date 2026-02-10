@@ -16,7 +16,6 @@ const prompt = Prompt({
 export const metadata: Metadata = {
   title: 'Commission Dashboard',
   description: 'Track and manage sales commissions',
-  generator: 'v0.app',
   icons: {
     icon: [
       {

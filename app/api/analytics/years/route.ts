@@ -11,10 +11,10 @@ export async function GET() {
     console.log('[API] Fetching available years from SALESCOMMISSION_Cache...')
     
     const queryString = `
-      SELECT DISTINCT YEAR(LASTSETTLEDATE) as Year
+      SELECT DISTINCT YEAR(INVOICEDATE) as Year
       FROM SALESCOMMISSION_Cache
-      WHERE LASTSETTLEDATE IS NOT NULL
-      ORDER BY YEAR(LASTSETTLEDATE) DESC
+      WHERE INVOICEDATE IS NOT NULL
+      ORDER BY YEAR(INVOICEDATE) DESC
     `
     
     const data = await query(queryString)

@@ -42,6 +42,7 @@ interface AnalyticsData {
   EmployeeName: string
   BPC_DIMENSION5_: string
   TotalQTY: number
+  PaidQTY: number
 }
 
 interface AnalyticsDetailData {
@@ -52,7 +53,18 @@ interface AnalyticsDetailData {
   RecId: string
   Description: string
   TotalQTY: number
+  InvoiceDate?: string
   LastSettleDate: string
+  // เพิ่มข้อมูล voucher type
+  VoucherType?: string
+  OriginalSettleDate?: string
+  // PDC Chain info
+  PDC_Voucher?: string | null
+  REM_Voucher?: string | null
+  SQP_Voucher?: string | null
+  SQP_Date?: string | null
+  // Credit Note info
+  CN_Voucher?: string | null
 }
 
 interface YearData {
@@ -292,8 +304,9 @@ export default function AnalyticsPage() {
     )
   }
 
-  // Calculate total
+  // Calculate totals
   const totalQTY = analyticsData.reduce((sum, item) => sum + item.TotalQTY, 0)
+  const totalPaidQTY = analyticsData.reduce((sum, item) => sum + item.PaidQTY, 0)
 
   // Calculate commission based on progressive rates
   const calculateCommission = (qty: number) => {
@@ -314,9 +327,11 @@ export default function AnalyticsPage() {
   }
 
   // Add commission calculation to each row
+  // อัตราเฉลี่ยคำนวณจาก TotalQTY (ยอดขาย)
+  // Commission = PaidQTY (ยอดชำระ) × อัตราเฉลี่ย
   const analyticsWithCommission = analyticsData.map(item => {
-    const commission = calculateCommission(item.TotalQTY)
-    const avgRate = calculateAvgRate(item.TotalQTY)
+    const avgRate = calculateAvgRate(item.TotalQTY)  // อัตราเฉลี่ยจากยอดขาย
+    const commission = item.PaidQTY * avgRate        // Commission จากยอดชำระ × อัตราเฉลี่ย
     return {
       ...item,
       Commission: commission,
@@ -333,9 +348,9 @@ export default function AnalyticsPage() {
       'ลำดับ': index + 1,
       'รหัสพนักงาน': item.EmployeeCode,
       'ชื่อพนักงาน': item.EmployeeName,
-      'BPC_DIMENSION5_': item.BPC_DIMENSION5_,
       'QTY รวม': item.TotalQTY,
       'อัตราเฉลี่ย (บาท/QTY)': item.AvgRate,
+      'QTY ที่ชำระแล้ว': item.PaidQTY,
       'Commission (บาท)': item.Commission
     }))
 
@@ -344,9 +359,9 @@ export default function AnalyticsPage() {
       'ลำดับ': '' as any,
       'รหัสพนักงาน': '',
       'ชื่อพนักงาน': 'รวมทั้งหมด',
-      'BPC_DIMENSION5_': '',
       'QTY รวม': totalQTY,
       'อัตราเฉลี่ย (บาท/QTY)': calculateAvgRate(totalQTY),
+      'QTY ที่ชำระแล้ว': totalPaidQTY,
       'Commission (บาท)': totalCommission
     })
 
@@ -358,9 +373,9 @@ export default function AnalyticsPage() {
       { wch: 8 },   // ลำดับ
       { wch: 15 },  // รหัสพนักงาน
       { wch: 30 },  // ชื่อพนักงาน
-      { wch: 20 },  // BPC_DIMENSION5_
       { wch: 15 },  // QTY รวม
       { wch: 20 },  // อัตราเฉลี่ย
+      { wch: 18 },  // QTY ที่ชำระแล้ว
       { wch: 18 }   // Commission
     ]
 
@@ -394,7 +409,12 @@ export default function AnalyticsPage() {
       'SALESID': item.SalesId,
       'INVOICEID': item.InvoiceId,
       'LASTSETTLEVOUCHER': item.LastSettleVoucher,
+      'ประเภท': item.VoucherType === 'CA' || item.VoucherType === 'RV' ? 'เงินสด' : 
+               item.VoucherType === 'PDC' ? 'เช็ค' : 
+               item.VoucherType === 'ICA' || item.VoucherType === 'ISW' ? 'ใบลดหนี้' :
+               item.VoucherType || '-',
       'RECID': item.RecId,
+      'INVOICEDATE': item.InvoiceDate ? format(new Date(item.InvoiceDate), 'dd/MM/yyyy') : '-',
       'วันที่ Settle': item.LastSettleDate ? format(new Date(item.LastSettleDate), 'dd/MM/yyyy') : '-',
       'QTY': item.TotalQTY
     }))
@@ -406,7 +426,9 @@ export default function AnalyticsPage() {
       'SALESID': '',
       'INVOICEID': '',
       'LASTSETTLEVOUCHER': '',
+      'ประเภท': '',
       'RECID': '',
+      'INVOICEDATE': '',
       'วันที่ Settle': 'รวมทั้งหมด',
       'QTY': totalDetailQTY
     })
@@ -420,7 +442,9 @@ export default function AnalyticsPage() {
       { wch: 18 },  // SALESID
       { wch: 18 },  // INVOICEID
       { wch: 20 },  // LASTSETTLEVOUCHER
+      { wch: 10 },  // ประเภท
       { wch: 15 },  // RECID
+      { wch: 15 },  // INVOICEDATE
       { wch: 15 },  // วันที่ Settle
       { wch: 12 }   // QTY
     ]
@@ -448,7 +472,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Analytics</h1>
           <p className="text-muted-foreground mt-2">
-            QTY Summary by BPC_DIMENSION5_ from SALESCOMMISSION_Cache (LASTSETTLEDATE)
+            QTY Summary by BPC_DIMENSION5_ | QTY รวม = INVOICEDATE, QTY ที่ชำระแล้ว = LASTSETTLEDATE
           </p>
         </div>
         
@@ -606,7 +630,7 @@ export default function AnalyticsPage() {
                 {selectedDimension ? ` - ${selectedDimension}` : ''}
               </h2>
               <div className="text-sm text-muted-foreground mb-4">
-                แสดงข้อมูล {analyticsWithCommission.length} รายการ | สูตร Commission: 1,000 แรก × 5 บาท, เกิน 1,000 × 8 บาท
+                แสดงข้อมูล {analyticsWithCommission.length} รายการ | สูตร: อัตราเฉลี่ยจาก QTY รวม (1,000 แรก × 5 บาท, เกิน 1,000 × 8 บาท) แล้ว Commission = QTY ที่ชำระ × อัตราเฉลี่ย
               </div>
               <div className="overflow-x-auto">
                 <Table>
@@ -617,6 +641,7 @@ export default function AnalyticsPage() {
                       <TableHead className="font-bold bg-primary text-primary-foreground">ชื่อพนักงาน</TableHead>
                       <TableHead className="font-bold bg-primary text-primary-foreground text-right">QTY รวม</TableHead>
                       <TableHead className="font-bold bg-primary text-primary-foreground text-right">อัตราเฉลี่ย (บาท/QTY)</TableHead>
+                      <TableHead className="font-bold bg-primary text-primary-foreground text-right">QTY ที่ชำระแล้ว</TableHead>
                       <TableHead className="font-bold bg-primary text-primary-foreground text-right">Commission (บาท)</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -645,6 +670,12 @@ export default function AnalyticsPage() {
                             maximumFractionDigits: 2 
                           })}
                         </TableCell>
+                        <TableCell className="text-right font-mono text-lg text-blue-600 font-semibold">
+                          {item.PaidQTY.toLocaleString('en-US', { 
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2 
+                          })}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-lg text-green-600 font-semibold">
                           {item.Commission.toLocaleString('en-US', { 
                             minimumFractionDigits: 2,
@@ -665,6 +696,12 @@ export default function AnalyticsPage() {
                       <TableCell className="text-right font-mono text-sm text-amber-600">
                         {calculateAvgRate(totalQTY).toLocaleString('en-US', { 
                           minimumFractionDigits: 2,
+                          maximumFractionDigits: 2 
+                        })}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-xl text-blue-600">
+                        {totalPaidQTY.toLocaleString('en-US', { 
+                          minimumFractionDigits: 0,
                           maximumFractionDigits: 2 
                         })}
                       </TableCell>
@@ -713,14 +750,32 @@ export default function AnalyticsPage() {
               <>
                 <div className="mb-4 p-4 bg-muted rounded-lg">
                   <div className="flex justify-between items-start">
-                    <div className="grid grid-cols-2 gap-4 flex-1">
+                    <div className="grid grid-cols-4 gap-4 flex-1">
                       <div>
                         <p className="text-sm text-muted-foreground">จำนวนรายการทั้งหมด</p>
                         <p className="text-2xl font-bold">{detailData.length.toLocaleString()} รายการ</p>
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">QTY รวม</p>
+                        <p className="text-sm text-muted-foreground">QTY รวม (ยอดขาย)</p>
                         <p className="text-2xl font-bold text-primary">
+                          {(selectedEmployee?.TotalQTY || 0).toLocaleString('en-US', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">QTY ที่ชำระแล้ว</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {(selectedEmployee?.PaidQTY || 0).toLocaleString('en-US', {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">QTY รายละเอียด (ตาราง)</p>
+                        <p className="text-2xl font-bold text-amber-600">
                           {detailData.reduce((sum, item) => sum + item.TotalQTY, 0).toLocaleString('en-US', {
                             minimumFractionDigits: 0,
                             maximumFractionDigits: 2
@@ -749,7 +804,9 @@ export default function AnalyticsPage() {
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[180px]">SALESID</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[180px]">INVOICEID</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[200px]">LASTSETTLEVOUCHER</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[80px]">ประเภท</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[150px]">RECID</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[120px]">INVOICEDATE</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[120px]">วันที่ Settle</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground text-right min-w-[100px]">QTY</TableHead>
                       </TableRow>
@@ -757,7 +814,7 @@ export default function AnalyticsPage() {
                     <TableBody>
                       {detailData.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                          <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                             ไม่พบข้อมูล
                           </TableCell>
                         </TableRow>
@@ -768,11 +825,32 @@ export default function AnalyticsPage() {
                             <TableCell className="font-mono text-xs">{item.SalesId}</TableCell>
                             <TableCell className="font-mono text-xs">{item.InvoiceId}</TableCell>
                             <TableCell className="font-mono text-xs">{item.LastSettleVoucher}</TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                item.VoucherType === 'CA' || item.VoucherType === 'RV' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                  : item.VoucherType === 'PDC' 
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                    : item.VoucherType === 'ICA' || item.VoucherType === 'ISW'
+                                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                      : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                              }`}>
+                                {item.VoucherType === 'CA' || item.VoucherType === 'RV' ? 'เงินสด' : 
+                                 item.VoucherType === 'PDC' ? 'เช็ค' : 
+                                 item.VoucherType === 'ICA' || item.VoucherType === 'ISW' ? 'ใบลดหนี้' :
+                                 item.VoucherType || '-'}
+                              </span>
+                            </TableCell>
                             <TableCell className="font-mono text-xs">{item.RecId}</TableCell>
+                            <TableCell>
+                              {item.InvoiceDate ? format(new Date(item.InvoiceDate), "dd/MM/yyyy", { locale: th }) : '-'}
+                            </TableCell>
                             <TableCell>
                               {item.LastSettleDate ? format(new Date(item.LastSettleDate), "dd/MM/yyyy", { locale: th }) : '-'}
                             </TableCell>
-                            <TableCell className="text-right font-mono text-primary font-semibold">
+                            <TableCell className={`text-right font-mono font-semibold ${
+                              item.TotalQTY < 0 ? 'text-red-600' : 'text-primary'
+                            }`}>
                               {item.TotalQTY.toLocaleString('en-US', {
                                 minimumFractionDigits: 0,
                                 maximumFractionDigits: 2

@@ -36,30 +36,80 @@ export async function GET(request: Request) {
     
     const allowedCodes = allEmployees.map(emp => emp.code)
     
-    // Query to get QTY sum by BPC_DIMENSION5_
-    let queryString = `
-      SELECT 
-        BPC_DIMENSION5_,
-        SUM(QTY) as TotalQTY
-      FROM SALESCOMMISSION_Cache
-      WHERE LASTSETTLEDATE IS NOT NULL AND BPC_DIMENSION5_ IS NOT NULL AND BPC_DIMENSION5_ != '' AND QTY > 0
-        AND (
-          ${allowedCodes.map(code => `BPC_DIMENSION5_ LIKE '${code}%'`).join(' OR ')}
-        )
-    `
+    /*
+      Logic สำหรับการคำนวณ QTY:
+      
+      1. TotalQTY = ยอดขายตาม INVOICEDATE (ใช้คำนวณอัตราเฉลี่ย)
+      2. PaidQTY = ยอดที่ชำระแล้วตาม LASTSETTLEDATE (ใช้คำนวณ Commission)
+      3. ICA/ISW (ใบลดหนี้) → QTY ลบ (หักออก)
+    */
+    
+    // Build date filter conditions
+    let invoiceDateFilter = ''
+    let settleDateFilter = ''
     
     if (startDate && endDate) {
-      queryString += ` AND LASTSETTLEDATE >= '${startDate}' AND LASTSETTLEDATE <= '${endDate}'`
+      invoiceDateFilter = `AND INVOICEDATE >= '${startDate}' AND INVOICEDATE <= '${endDate}'`
+      settleDateFilter = `AND LASTSETTLEDATE >= '${startDate}' AND LASTSETTLEDATE <= '${endDate}'`
     } else if (year) {
-      queryString += ` AND YEAR(LASTSETTLEDATE) = ${parseInt(year)}`
+      invoiceDateFilter = `AND YEAR(INVOICEDATE) = ${parseInt(year)}`
+      settleDateFilter = `AND YEAR(LASTSETTLEDATE) = ${parseInt(year)}`
     }
     
-    if (dimension) {
-      queryString += ` AND BPC_DIMENSION5_ = '${dimension}'`
-    }
+    const dimensionFilter = dimension ? `AND BPC_DIMENSION5_ = '${dimension}'` : ''
     
-    queryString += `
-      GROUP BY BPC_DIMENSION5_
+    // Query for TotalQTY (INVOICEDATE) and PaidQTY (LASTSETTLEDATE)
+    let queryString = `
+      WITH InvoiceQTY AS (
+        SELECT 
+          BPC_DIMENSION5_,
+          SUM(
+            CASE 
+              WHEN LASTSETTLEVOUCHER LIKE 'ICA%' OR LASTSETTLEVOUCHER LIKE 'ISW%'
+                THEN -QTY
+              ELSE QTY
+            END
+          ) as TotalQTY
+        FROM SALESCOMMISSION_Cache
+        WHERE INVOICEDATE IS NOT NULL 
+          AND BPC_DIMENSION5_ IS NOT NULL 
+          AND BPC_DIMENSION5_ != '' 
+          AND QTY > 0
+          AND (
+            ${allowedCodes.map(code => `BPC_DIMENSION5_ LIKE '${code}%'`).join(' OR ')}
+          )
+          ${invoiceDateFilter}
+          ${dimensionFilter}
+        GROUP BY BPC_DIMENSION5_
+      ),
+      SettleQTY AS (
+        SELECT 
+          BPC_DIMENSION5_,
+          SUM(
+            CASE 
+              WHEN LASTSETTLEVOUCHER LIKE 'ICA%' OR LASTSETTLEVOUCHER LIKE 'ISW%'
+                THEN -QTY
+              ELSE QTY
+            END
+          ) as PaidQTY
+        FROM SALESCOMMISSION_Cache
+        WHERE LASTSETTLEDATE IS NOT NULL 
+          AND BPC_DIMENSION5_ IS NOT NULL 
+          AND BPC_DIMENSION5_ != '' 
+          AND QTY > 0
+          AND (
+            ${allowedCodes.map(code => `BPC_DIMENSION5_ LIKE '${code}%'`).join(' OR ')}
+          )
+          ${settleDateFilter}
+          ${dimensionFilter}
+        GROUP BY BPC_DIMENSION5_
+      )
+      SELECT 
+        COALESCE(i.BPC_DIMENSION5_, s.BPC_DIMENSION5_) as BPC_DIMENSION5_,
+        ISNULL(i.TotalQTY, 0) as TotalQTY,
+        ISNULL(s.PaidQTY, 0) as PaidQTY
+      FROM InvoiceQTY i
+      FULL OUTER JOIN SettleQTY s ON i.BPC_DIMENSION5_ = s.BPC_DIMENSION5_
       ORDER BY BPC_DIMENSION5_
     `
     
@@ -69,16 +119,23 @@ export async function GET(request: Request) {
     const dbMap = new Map()
     dbData.forEach((row: any) => {
       const code = row.BPC_DIMENSION5_.split(',')[0]
-      dbMap.set(code, row.TotalQTY)
+      dbMap.set(code, {
+        TotalQTY: row.TotalQTY || 0,
+        PaidQTY: row.PaidQTY || 0
+      })
     })
     
     // Merge with all employees list
-    const data = allEmployees.map(emp => ({
-      EmployeeCode: emp.code,
-      EmployeeName: emp.name,
-      BPC_DIMENSION5_: `${emp.code},${emp.name}`,
-      TotalQTY: dbMap.get(emp.code) || 0
-    }))
+    const data = allEmployees.map(emp => {
+      const qtyData = dbMap.get(emp.code) || { TotalQTY: 0, PaidQTY: 0 }
+      return {
+        EmployeeCode: emp.code,
+        EmployeeName: emp.name,
+        BPC_DIMENSION5_: `${emp.code},${emp.name}`,
+        TotalQTY: qtyData.TotalQTY,
+        PaidQTY: qtyData.PaidQTY
+      }
+    })
     
     const duration = Date.now() - startTime
     
