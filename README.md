@@ -51,7 +51,7 @@ cp .env.example .env.local
 # SQL Server Configuration
 MSSQL_USER=sa
 MSSQL_PASSWORD=your_password
-MSSQL_SERVER=192.168.2.26
+MSSQL_SERVER=localhost
 MSSQL_DATABASE=UAT_Cache
 MSSQL_ENCRYPT=false
 MSSQL_TRUST_SERVER_CERTIFICATE=true
