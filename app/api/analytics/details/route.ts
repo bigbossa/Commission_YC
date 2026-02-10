@@ -36,7 +36,7 @@ export async function GET(request: Request) {
         SALESID,
         INVOICEID,
         LASTSETTLEVOUCHER,
-        RECID,
+        CUSTACCOUNT,
         BPC_DIMENSION5_,
         -- QTY: ใบลดหนี้ = ลบ, อื่นๆ = บวก
         CASE 
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
       SalesId: row.SALESID || '-',
       InvoiceId: row.INVOICEID || '-',
       LastSettleVoucher: row.LASTSETTLEVOUCHER || '-',
-      RecId: row.RECID || '-',
+      AccountNum: row.CUSTACCOUNT || '-',
       Description: row.BPC_DIMENSION5_ || '-',
       TotalQTY: row.QTY || 0,
       InvoiceDate: row.InvoiceDate || null,

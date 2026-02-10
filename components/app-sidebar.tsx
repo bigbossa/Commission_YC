@@ -5,13 +5,13 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
   Home, 
-  ShoppingCart, 
-  Package, 
-  BarChart3, 
+  Database, 
+  FileText, 
+  Coins, 
   Menu,
   X,
-  Calculator,
-  Clock
+  BookOpen,
+  AlertCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -26,28 +26,28 @@ const routes = [
   },
   {
     label: "CustSettleCache",
-    icon: ShoppingCart,
+    icon: Database,
     href: "/sales",
   },
   {
     label: "SALESCOMMISSION",
-    icon: Package,
+    icon: Database,
     href: "/products",
   },
   {
-    label: "Commission",
-    icon: BarChart3,
+    label: "คำนวนค่า Commission",
+    icon: Coins,
     href: "/analytics",
   },
   {
-    label: "สูตรคำนวณ",
-    icon: Calculator,
-    href: "/formula",
+    label: "ยอดค้างชำระ QTY",
+    icon: AlertCircle,
+    href: "/outstanding",
   },
   {
-    label: "ยอดค้างชำระ",
-    icon: Clock,
-    href: "/outstanding",
+    label: "สูตรคำนวณ",
+    icon: BookOpen,
+    href: "/formula",
   },
 ]
 

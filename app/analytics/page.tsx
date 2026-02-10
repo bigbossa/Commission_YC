@@ -50,7 +50,7 @@ interface AnalyticsDetailData {
   SalesId: string
   InvoiceId: string
   LastSettleVoucher: string
-  RecId: string
+  AccountNum: string
   Description: string
   TotalQTY: number
   InvoiceDate?: string
@@ -413,7 +413,7 @@ export default function AnalyticsPage() {
                item.VoucherType === 'PDC' ? 'เช็ค' : 
                item.VoucherType === 'ICA' || item.VoucherType === 'ISW' ? 'ใบลดหนี้' :
                item.VoucherType || '-',
-      'RECID': item.RecId,
+      'ACCOUNTNUM': item.AccountNum,
       'INVOICEDATE': item.InvoiceDate ? format(new Date(item.InvoiceDate), 'dd/MM/yyyy') : '-',
       'วันที่ Settle': item.LastSettleDate ? format(new Date(item.LastSettleDate), 'dd/MM/yyyy') : '-',
       'QTY': item.TotalQTY
@@ -427,7 +427,7 @@ export default function AnalyticsPage() {
       'INVOICEID': '',
       'LASTSETTLEVOUCHER': '',
       'ประเภท': '',
-      'RECID': '',
+      'ACCOUNTNUM': '',
       'INVOICEDATE': '',
       'วันที่ Settle': 'รวมทั้งหมด',
       'QTY': totalDetailQTY
@@ -443,7 +443,7 @@ export default function AnalyticsPage() {
       { wch: 18 },  // INVOICEID
       { wch: 20 },  // LASTSETTLEVOUCHER
       { wch: 10 },  // ประเภท
-      { wch: 15 },  // RECID
+      { wch: 15 },  // ACCOUNTNUM
       { wch: 15 },  // INVOICEDATE
       { wch: 15 },  // วันที่ Settle
       { wch: 12 }   // QTY
@@ -659,10 +659,15 @@ export default function AnalyticsPage() {
                         </TableCell>
                         <TableCell className="font-medium">{item.EmployeeName}</TableCell>
                         <TableCell className="text-right font-mono text-lg text-primary font-semibold">
-                          {item.TotalQTY.toLocaleString('en-US', { 
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2 
-                          })}
+                          <button 
+                            onClick={() => fetchEmployeeDetails(item)}
+                            className="text-primary hover:text-primary/80 hover:underline transition-colors cursor-pointer font-semibold"
+                          >
+                            {item.TotalQTY.toLocaleString('en-US', { 
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2 
+                            })}
+                          </button>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm text-amber-600">
                           {item.AvgRate.toLocaleString('en-US', { 
@@ -671,10 +676,15 @@ export default function AnalyticsPage() {
                           })}
                         </TableCell>
                         <TableCell className="text-right font-mono text-lg text-blue-600 font-semibold">
-                          {item.PaidQTY.toLocaleString('en-US', { 
-                            minimumFractionDigits: 0,
-                            maximumFractionDigits: 2 
-                          })}
+                          <button 
+                            onClick={() => fetchEmployeeDetails(item)}
+                            className="text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer font-semibold"
+                          >
+                            {item.PaidQTY.toLocaleString('en-US', { 
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2 
+                            })}
+                          </button>
                         </TableCell>
                         <TableCell className="text-right font-mono text-lg text-green-600 font-semibold">
                           {item.Commission.toLocaleString('en-US', { 
@@ -805,7 +815,7 @@ export default function AnalyticsPage() {
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[180px]">INVOICEID</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[200px]">LASTSETTLEVOUCHER</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[80px]">ประเภท</TableHead>
-                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[150px]">RECID</TableHead>
+                        <TableHead className="font-bold bg-primary text-primary-foreground min-w-[150px]">ACCOUNTNUM</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[120px]">INVOICEDATE</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground min-w-[120px]">วันที่ Settle</TableHead>
                         <TableHead className="font-bold bg-primary text-primary-foreground text-right min-w-[100px]">QTY</TableHead>
@@ -841,7 +851,7 @@ export default function AnalyticsPage() {
                                  item.VoucherType || '-'}
                               </span>
                             </TableCell>
-                            <TableCell className="font-mono text-xs">{item.RecId}</TableCell>
+                            <TableCell className="font-mono text-xs">{item.AccountNum}</TableCell>
                             <TableCell>
                               {item.InvoiceDate ? format(new Date(item.InvoiceDate), "dd/MM/yyyy", { locale: th }) : '-'}
                             </TableCell>
